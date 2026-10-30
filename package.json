@@ -1,0 +1,24 @@
+{
+  "name": "claude-zh-guard",
+  "version": "0.1.0",
+  "description": "打不坏的 Claude Desktop 汉化管理器（Windows MSIX）：i18n 注入 + 更新守护 + 自动自愈",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "bin": {
+    "cdzh": "bin/cdzh.js"
+  },
+  "scripts": {
+    "test": "node --test tests/",
+    "typecheck": "tsc --noEmit",
+    "cdzh": "node src/cli.ts"
+  },
+  "devDependencies": {
+    "@electron/asar": "^4.0.1",
+    "@types/node": "^26.0.0",
+    "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": ">=22.7"
+  }
+}

@@ -1,0 +1,15 @@
+ NOTICE — 第三方素材说明
+========================
+
+本仓库 assets/dict/ 下的简体/繁体中文词典文件（frontend-zh-*.json、
+dynamic-zh-*.json、statsig-zh-*.json、desktop-zh-*.json）复制自开源项目：
+
+    javaht/claude-desktop-zh-cn
+    https://github.com/javaht/claude-desktop-zh-cn
+    License: MIT (Copyright 2025 javaht)
+
+这些词典的键为 Claude Desktop 前端 react-intl 的哈希消息 ID，
+值为 ICU MessageFormat 格式的中文翻译，由该项目的人工与 LLM 协作
+翻译流程产出。依据 MIT 协议在此引用并致谢。
+
+本仓库其余代码为原创，同样以 MIT 协议发布。
