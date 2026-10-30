@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="hTitle hDesc">
+  <title id="hTitle">claude-zh-guard</title>
+  <desc id="hDesc">claude-zh-guard：给 Windows 版 Claude Desktop 装上中文界面，提供更新守护与自动自愈。右侧是 cdzh doctor 体检全绿的真实输出。</desc>
+  <rect width="1200" height="360" rx="18" fill="#16130F"/>
+
+  <g id="title-block" transform="translate(56 54)">
+    <text y="0" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="17" fill="#93897A" letter-spacing="3">WINDOWS MSIX · 3P MODE READY</text>
+    <text y="64" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="54" font-weight="700" fill="#F5F1E8">claude<tspan fill="#D97757">-zh-guard</tspan></text>
+    <text y="112" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="25" fill="#F5F1E8">给 Claude Desktop 装上中文界面，</text>
+    <text y="146" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="25" fill="#F5F1E8">官方自动更新再也撞不坏。</text>
+    <g transform="translate(0 180)">
+      <rect width="532" height="52" rx="10" fill="#211C15" stroke="#3A342B"/>
+      <text x="20" y="34" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="19" fill="#F5F1E8"><tspan fill="#D97757">❯</tspan> node src\cli.ts install --yes --launch</text>
+      <rect x="500" y="14" width="10" height="24" fill="#D97757"/>
+    </g>
+    <text y="280" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="16" fill="#93897A">MIT · Node ≥ 22.7 · Windows 10+ · 词典覆盖 89.8%</text>
+  </g>
+
+  <g id="doctor-proof" transform="translate(692 46)">
+    <rect width="452" height="268" rx="14" fill="#0F0D0A" stroke="#3A342B"/>
+    <path d="M14 0 h424 a14 14 0 0 1 14 14 v24 h-452 v-24 a14 14 0 0 1 14-14 z" fill="#211C15"/>
+    <circle cx="24" cy="19" r="6" fill="#E5654E"/>
+    <circle cx="46" cy="19" r="6" fill="#E9B44C"/>
+    <circle cx="68" cy="19" r="6" fill="#6FBF73"/>
+    <text x="226" y="24" text-anchor="middle" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="14" fill="#93897A">cdzh doctor</text>
+    <g transform="translate(24 70)" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="18">
+      <text y="0" fill="#93897A">$ cdzh doctor</text>
+      <text y="33"><tspan fill="#6FBF73">✓</tspan><tspan fill="#F5F1E8"> 安装: msix v4.4212.0.0</tspan></text>
+      <text y="66"><tspan fill="#6FBF73">✓</tspan><tspan fill="#F5F1E8"> 补丁状态: 已安装 (zh-CN)</tspan></text>
+      <text y="99"><tspan fill="#6FBF73">✓</tspan><tspan fill="#F5F1E8"> exe 内嵌哈希与实际一致</tspan></text>
+      <text y="132"><tspan fill="#6FBF73">✓</tspan><tspan fill="#F5F1E8"> 备份校验通过 (双版本)</tspan></text>
+      <text y="165"><tspan fill="#6FBF73">✓</tspan><tspan fill="#F5F1E8"> 体检结果: 全部通过</tspan></text>
+      <text y="198" fill="#93897A">❯<tspan fill="#D97757">▮</tspan></text>
+    </g>
+  </g>
+</svg>

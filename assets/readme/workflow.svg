@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="240" viewBox="0 0 1200 240" role="img" aria-labelledby="wTitle wDesc">
+  <title id="wTitle">受控更新管线</title>
+  <desc id="wDesc">cdzh update 的四个阶段：恢复纯净、放行官方更新、重打补丁、体检全绿，任何阶段失败自动回滚。</desc>
+  <rect width="1200" height="240" rx="18" fill="#16130F"/>
+  <text x="56" y="42" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="17" fill="#93897A" letter-spacing="2">cdzh update · CONTROLLED UPDATE PIPELINE</text>
+
+  <g id="stage-1" transform="translate(56 66)">
+    <rect width="236" height="130" rx="12" fill="#211C15" stroke="#3A342B"/>
+    <text x="20" y="46" font-family="-apple-system, Segoe UI, PingFang SC, sans-serif" font-size="22" font-weight="600" fill="#F5F1E8">恢复纯净</text>
+    <text x="20" y="76" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="15" fill="#D97757">restore pristine</text>
+    <text x="20" y="108" font-family="-apple-system, Segoe UI, PingFang SC, sans-serif" font-size="18" fill="#93897A">哈希对齐防重写</text>
+  </g>
+  <path d="M304 131 h24 m0 0 l-8 -6 m8 6 l-8 6" stroke="#D97757" stroke-width="2.5" fill="none"/>
+
+  <g id="stage-2" transform="translate(340 66)">
+    <rect width="236" height="130" rx="12" fill="#211C15" stroke="#3A342B"/>
+    <text x="20" y="46" font-family="-apple-system, Segoe UI, PingFang SC, sans-serif" font-size="22" font-weight="600" fill="#F5F1E8">放行官方更新</text>
+    <text x="20" y="76" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="15" fill="#D97757">official MSIX</text>
+    <text x="20" y="108" font-family="-apple-system, Segoe UI, PingFang SC, sans-serif" font-size="18" fill="#93897A">新版本干净落位</text>
+  </g>
+  <path d="M588 131 h24 m0 0 l-8 -6 m8 6 l-8 6" stroke="#D97757" stroke-width="2.5" fill="none"/>
+
+  <g id="stage-3" transform="translate(624 66)">
+    <rect width="236" height="130" rx="12" fill="#211C15" stroke="#3A342B"/>
+    <text x="20" y="46" font-family="-apple-system, Segoe UI, PingFang SC, sans-serif" font-size="22" font-weight="600" fill="#F5F1E8">重打补丁</text>
+    <text x="20" y="76" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="15" fill="#D97757">i18n + integrity</text>
+    <text x="20" y="108" font-family="-apple-system, Segoe UI, PingFang SC, sans-serif" font-size="18" fill="#93897A">原子替换+校验</text>
+  </g>
+  <path d="M872 131 h24 m0 0 l-8 -6 m8 6 l-8 6" stroke="#D97757" stroke-width="2.5" fill="none"/>
+
+  <g id="stage-4" transform="translate(908 66)">
+    <rect width="236" height="130" rx="12" fill="#1C241A" stroke="#6FBF73"/>
+    <text x="20" y="46" font-family="-apple-system, Segoe UI, PingFang SC, sans-serif" font-size="22" font-weight="600" fill="#F5F1E8">体检全绿</text>
+    <text x="20" y="76" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="15" fill="#6FBF73">doctor pass</text>
+    <text x="20" y="108" font-family="-apple-system, Segoe UI, PingFang SC, sans-serif" font-size="18" fill="#93897A">失败自动回滚</text>
+  </g>
+</svg>
