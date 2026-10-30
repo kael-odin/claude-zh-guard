@@ -58,32 +58,37 @@ export function dirExists(p: string): boolean {
   }
 }
 
-/** 优雅关闭 Claude 相关进程：先窗口关闭，超时后强杀。 */
-export async function stopClaudeProcesses(graceMs = 8000): Promise<string[]> {
+/** 关闭 Claude 相关进程：托盘应用会无视优雅关闭，直接按镜像名强杀并多轮验证。 */
+export async function stopClaudeProcesses(graceMs = 10000): Promise<string[]> {
   const killed: string[] = [];
-  const targets = () => listClaudePids();
-  let open = targets();
-  if (open.length === 0) return killed;
-  for (const pid of open) {
-    try {
-      run('taskkill', ['/PID', String(pid)], { quiet: true });
-    } catch {
-      /* 无窗口进程，忽略 */
-    }
-  }
-  const deadline = Date.now() + graceMs;
-  while (Date.now() < deadline) {
-    open = targets();
+  for (let round = 0; round < 3; round++) {
+    const open = listClaudePids();
     if (open.length === 0) break;
-    await new Promise((r) => setTimeout(r, 500));
-  }
-  for (const pid of targets()) {
+    // 按镜像名树杀（覆盖全部实例与其子进程）；cowork-svc 为提权服务，可能拒绝，忽略
     try {
-      run('taskkill', ['/PID', String(pid), '/T', '/F'], { quiet: true });
-      killed.push(String(pid));
+      run('taskkill', ['/IM', 'claude.exe', '/T', '/F'], { quiet: true });
     } catch {
-      /* 已退出 */
+      /* 逐 PID 兜底 */
+      for (const p of open) {
+        if (/claude\.exe/i.test(p.name)) {
+          try {
+            run('taskkill', ['/PID', String(p.pid), '/T', '/F'], { quiet: true });
+          } catch {
+            /* 已退出 */
+          }
+        }
+      }
     }
+    killed.push(...open.map((p) => String(p.pid)));
+    const deadline = Date.now() + graceMs;
+    while (Date.now() < deadline) {
+      if (listClaudePids().length === 0) break;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  }
+  if (listClaudePids().length > 0) {
+    // 给文件句柄释放留点时间
+    await new Promise((r) => setTimeout(r, 2000));
   }
   return killed;
 }
