@@ -798,6 +798,11 @@ export function launch(inst: ClaudeInstall): void {
   if (inst.kind === 'msix' && inst.aumid) {
     // 实测：Start-Process 直接传 shell: 偶发失败；交给 explorer.exe 激活稳定
     startDetached('explorer.exe', [`shell:AppsFolder\\${inst.aumid}`]);
+    // 新版可能启动后缩到托盘：等窗口出现后恢复并置前
+    const showScript = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'show-claude-window.ps1');
+    if (fileExists(showScript)) {
+      startDetached('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', showScript]);
+    }
     ok(`已通过 MSIX 激活启动 (${inst.aumid})`);
   } else {
     startDetached(inst.exePath, []);
