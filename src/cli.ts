@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { detectInstall, toolDataDir } from './detect.ts';
 import { doctor } from './doctor.ts';
-import { install, LANGS, launch, uninstall, type Lang } from './patch.ts';
+import { assessIonDist, install, LANGS, launch, uninstall, type Lang } from './patch.ts';
 import { getUpdatePolicyState, setUpdatesDisabled } from './policy.ts';
 import { controlledUpdate, repair } from './update.ts';
 import { watch, installWatchTask } from './guard.ts';
@@ -24,7 +24,7 @@ const HELP = `claude-zh-guard — 打不坏的 Claude Desktop 汉化管理器
   watch-task install|uninstall   注册/注销开机守护计划任务
   updates on|off|status 官方自动更新策略（默认保留；off 为可选加固）
   dict check|sync       词典覆盖率检查 / 从上游仓库同步词典
-  launch                MSIX 激活启动 Claude
+  launch                MSIX 激活启动 Claude（损坏自动修复）
 
 选项:
   --lang zh-CN|zh-TW|zh-HK   界面语言（默认 zh-CN）
@@ -241,6 +241,12 @@ async function main(): Promise<void> {
       case 'launch': {
         const inst = detectInstall();
         if (!inst) throw new Error('未检测到 Claude Desktop 安装');
+        // 自愈：官方更新可能把界面包写成 0 字节，启动前先修复
+        const st = assessIonDist(inst, args.lang);
+        if (!st.parseable) {
+          warn(`检测到界面包损坏: ${st.error}，尝试自动修复 ...`);
+          await repair(args.lang);
+        }
         launch(inst);
         return;
       }

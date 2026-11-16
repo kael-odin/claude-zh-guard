@@ -61,7 +61,7 @@ watch                   守护巡检（--interval 秒数；--no-auto-fix 只提�
 watch-task install|uninstall   注册/注销开机守护计划任务
 updates on|off|status   官方自动更新策略（默认保留，off 为可选加固）
 dict check|sync         词典覆盖率 / 从上游仓库同步
-launch                  MSIX 激活启动 Claude
+launch                  MSIX 激活启动 Claude（启动前自检，损坏自动修复）
 ```
 
 选项：`--lang zh-CN|zh-TW|zh-HK` · `--yes` · `--launch` · `--disable-updates` · `--elevate`
