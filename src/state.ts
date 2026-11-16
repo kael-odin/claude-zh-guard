@@ -11,6 +11,7 @@ export interface BackupInfo {
   ionDistHeaderHash: string;
   exeSha256: string;
   exeMarkers: Array<{ asar: string; hash: string }>; // 打补丁前 exe 内嵌值
+  appAsarSha256?: string; // 4.23118+ 主进程菜单词库也需备份/还原
   createdAt: string;
 }
 

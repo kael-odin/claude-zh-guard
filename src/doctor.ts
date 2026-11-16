@@ -1,12 +1,12 @@
 // doctor：只读体检。repair 场景由 patch/cli 组合完成
 import fs from 'node:fs';
 import path from 'node:path';
-import { getFileNode, listFiles, parseAsar, readEmbeddedHeaderHash, sha256hex } from './asar.ts';
+import { getFileNode, listFiles, parseAsar, readEmbeddedHeaderHash, readFileNode, sha256hex } from './asar.ts';
 import { detectInstall, existingConfigLibraries, existingConfigPaths, type ClaudeInstall } from './detect.ts';
 import { findExeMarkers } from './exeinteg.ts';
 import { getUpdatePolicyState } from './policy.ts';
 import { backupDirFor, loadState } from './state.ts';
-import { assessIonDist } from './patch.ts';
+import { assessIonDist, catalogLooksChinese } from './patch.ts';
 import { dirExists, fail, fileExists, fmtBytes, info, listClaudePids, ok, run, warn, YELLOW, GREEN, RED, DIM } from './util.ts';
 
 export interface DoctorReport {
@@ -58,10 +58,36 @@ export function doctor(lang = 'zh-CN'): DoctorReport {
     add(closed ? 'ok' : 'fail', `偏移闭合校验 ${closed ? '通过' : `失败(contentBase=${pa.contentBase}, maxEnd=${maxEnd}, fileSize=${pa.fileSize})`}`);
     // 补丁状态
     const zhNode = getFileNode(pa, `i18n/${lang}.json`);
-    add(st.anchorHasLang ? 'ok' : st.zhInHeader ? 'warn' : 'info', `补丁状态: ${st.anchorHasLang ? `已安装 (${lang} 白名单+词典)` : st.zhInHeader ? '部分(词典在,白名单未改)' : '未安装'}`);
+    const patchedState = st.anchorHasLang || (st.zhInHeader && st.enUsMerged);
+    add(
+      patchedState ? 'ok' : st.zhInHeader || st.anchorHasLang || st.enUsMerged ? 'warn' : 'info',
+      `补丁状态: ${
+        patchedState
+          ? `已安装 (${lang} 白名单+词典+en-US 中文覆盖)`
+          : st.zhInHeader || st.anchorHasLang || st.enUsMerged
+            ? '部分（词库/白名单/en-US 覆盖不完整，建议重新 install）'
+            : '未安装'
+      }`,
+    );
     if (zhNode) add('ok', `词典文件: i18n/${lang}.json (${fmtBytes(zhNode.size)})`);
     // 官方白名单锚点完整性
     if (st.anchorHits === 0 && !st.anchorHasLang) add('fail', '未找到官方语言白名单锚点（版本兼容性问题）');
+  }
+
+  // app.asar 主进程壳层词库（Claude 4.23118+）
+  try {
+    const appPa = parseAsar(inst.appAsarPath);
+    const appEn = getFileNode(appPa, 'resources/i18n/en-US.json');
+    if (appEn) {
+      const merged = catalogLooksChinese(readFileNode(appPa, appEn));
+      const zh = getFileNode(appPa, `resources/i18n/${lang}.json`);
+      add(merged ? 'ok' : 'info', `主进程词库 en-US ${merged ? '已中文化' : '未中文化'}`);
+      add(zh ? 'ok' : 'info', `主进程中文词库 resources/i18n/${lang}.json ${zh ? '存在' : '未安装'}`);
+    } else {
+      add('info', 'app.asar 无 resources/i18n（该版本可能不读取主进程壳层词库）');
+    }
+  } catch (e) {
+    add('warn', `app.asar 读取失败: ${(e as Error).message}`);
   }
 
   // exe 内嵌哈希 vs 实际
@@ -110,9 +136,18 @@ export function doctor(lang = 'zh-CN'): DoctorReport {
       else {
         try {
           const h = sha256hex(fs.readFileSync(p));
-          add(h === b.ionDistSha256 ? 'ok' : 'fail', `备份 v${b.version} 校验${h === b.ionDistSha256 ? '通过' : '失败'}`);
+          add(h === b.ionDistSha256 ? 'ok' : 'fail', `备份 v${b.version} ion-dist 校验${h === b.ionDistSha256 ? '通过' : '失败'}`);
         } catch (e) {
           add('fail', `备份读取失败: ${(e as Error).message}`);
+        }
+      }
+      if (b.appAsarSha256) {
+        const ap = path.join(b.dir, 'app.asar');
+        try {
+          const ah = fileExists(ap) ? sha256hex(fs.readFileSync(ap)) : '';
+          add(ah === b.appAsarSha256 ? 'ok' : 'fail', `备份 v${b.version} app.asar 校验${ah === b.appAsarSha256 ? '通过' : '失败'}`);
+        } catch {
+          add('fail', `备份 v${b.version} app.asar 读取失败`);
         }
       }
     }
@@ -148,7 +183,7 @@ export function doctor(lang = 'zh-CN'): DoctorReport {
     add('info', '无法读取 AppX 部署事件日志（不影响使用）');
   }
 
-  const patched = st.parseable && (st.anchorHasLang || st.zhInHeader);
+  const patched = st.parseable && (st.anchorHasLang || st.zhInHeader || st.enUsMerged);
   const healthy = lines.filter((l) => l.level === 'fail').length === 0;
   return { install: inst, lines, patched, healthy };
 }

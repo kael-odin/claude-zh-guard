@@ -14,7 +14,7 @@ export interface Integrity {
 
 export interface AsarFileNode {
   size: number;
-  offset: string;
+  offset?: string; // unpacked 条目没有内容区偏移
   unpacked?: boolean;
   integrity?: Integrity;
 }
@@ -173,6 +173,7 @@ function getDirNode(tree: FileTree, vdir: string): AsarDirNode | undefined {
 
 export function readFileNode(pa: ParsedAsar, node: AsarFileNode): Buffer {
   if (node.unpacked) throw new Error(`该文件为 unpacked 条目，不在 asar 内: ${node.offset}`);
+  if (node.offset === undefined) throw new Error('asar 文件节点缺少 offset（结构异常）');
   const buf = Buffer.alloc(node.size);
   const fd = fs.openSync(pa.path, 'r');
   try {
@@ -239,14 +240,16 @@ export function surgicalRebuild(srcAsar: string, destAsar: string, upserts: Upse
     return n?.integrity !== undefined;
   });
   const emitIntegrity = mode === 'always' ? true : mode === 'never' ? false : srcHasIntegrity;
-  const hasUnpacked = listFiles(src.tree).some((p) => getFileNode(src, p)?.unpacked);
-  if (hasUnpacked) {
-    throw new Error('源 asar 含 unpacked 条目，本工具暂不支持（ion-dist.asar 不应有此类条目）');
-  }
 
-  // 先记录全部旧位置（重分配偏移后仍需按旧偏移从源文件流式拷贝）
+  // app.asar 含 unpacked 条目（原生模块/exe），内容在外部目录：
+  // 头部元数据原样保留，不参与偏移分配与内容区拷贝。
+  const isPacked = (node: AsarFileNode) => !node.unpacked;
+
+  // 先记录全部打包文件的旧位置（重分配偏移后仍需按旧偏移从源文件流式拷贝）
   const oldLocation = new Map<string, { offset: string; size: number }>();
-  for (const [p, node] of orderedFiles(tree)) oldLocation.set(p, { offset: node.offset, size: node.size });
+  for (const [p, node] of orderedFiles(tree)) {
+    if (isPacked(node)) oldLocation.set(p, { offset: node.offset!, size: node.size });
+  }
 
   // 应用 upsert：节点标记 pending 数据
   const pending = new Map<string, Buffer>();
@@ -270,20 +273,22 @@ export function surgicalRebuild(srcAsar: string, destAsar: string, upserts: Upse
     pending.set(up.vpath, up.data);
   }
 
-  // 重新分配偏移
+  // 重新分配偏移（仅内容区条目；unpacked 保持原元数据）
   const ordered = orderedFiles(tree);
   let cursor = 0;
   for (const [, node] of ordered) {
+    if (!isPacked(node)) continue;
     node.offset = String(cursor);
     cursor += node.size;
   }
 
-  // integrity 块：always 模式需在写头前为每个文件算好（未改动文件流式哈希，不整读进内存）
+  // integrity 块：always 模式需在写头前为每个打包文件算好（未改动文件流式哈希，不整读进内存）
   if (emitIntegrity) {
     const srcFd0 = fs.openSync(srcAsar, 'r');
     try {
       const chunk = Buffer.alloc(4 * 1024 * 1024);
       for (const [vpath, node] of ordered) {
+        if (!isPacked(node)) continue; // unpacked 文件由外部目录承载，原 integrity 保留
         const pend = pending.get(vpath);
         if (pend) {
           node.integrity = computeIntegrity(pend);
@@ -324,6 +329,10 @@ export function surgicalRebuild(srcAsar: string, destAsar: string, upserts: Upse
     }
   }
 
+  if (mode === 'never') {
+    for (const [, node] of ordered) delete node.integrity;
+  }
+
   const header = buildPickleHeader(tree);
   const contentBase = header.length;
   const tmp = `${destAsar}.tmp-${process.pid}-${Date.now()}`;
@@ -333,6 +342,7 @@ export function surgicalRebuild(srcAsar: string, destAsar: string, upserts: Upse
     fs.writeSync(dstFd, header);
     const chunk = Buffer.alloc(8 * 1024 * 1024);
     for (const [vpath, node] of ordered) {
+      if (!isPacked(node)) continue; // unpacked 内容不在 asar 内
       const pend = pending.get(vpath);
       if (pend) {
         fs.writeSync(dstFd, pend);
@@ -377,8 +387,13 @@ export function surgicalRebuild(srcAsar: string, destAsar: string, upserts: Upse
   };
 }
 
-/** 从零构建 asar（测试夹具/小档案用）。返回头部 pickle 的 SHA256。 */
-export function createAsar(destAsar: string, files: Map<string, Buffer>, opts?: { integrity?: boolean }): string {
+/** 从零构建 asar（测试夹具/小档案用）。返回头部 pickle 的 SHA256。
+ * unpacked 集合中的条目只写头部元数据（unpacked:true、无 offset），内容不写入档案。 */
+export function createAsar(
+  destAsar: string,
+  files: Map<string, Buffer>,
+  opts?: { integrity?: boolean; unpacked?: Set<string> },
+): string {
   const tree: FileTree = {};
   const pending = new Map<string, Buffer>();
   for (const [vpath, data] of files) {
@@ -390,12 +405,16 @@ export function createAsar(destAsar: string, files: Map<string, Buffer>, opts?: 
       cur = (cur[name] as AsarDirNode).files;
     }
     const leaf = parts[parts.length - 1]!;
-    cur[leaf] = { size: data.length, offset: '0', ...(opts?.integrity ? { integrity: computeIntegrity(data) } : {}) };
-    pending.set(vpath, data);
+    const unpacked = opts?.unpacked?.has(vpath) ?? false;
+    cur[leaf] = unpacked
+      ? { size: data.length, unpacked: true, ...(opts?.integrity ? { integrity: computeIntegrity(data) } : {}) }
+      : { size: data.length, offset: '0', ...(opts?.integrity ? { integrity: computeIntegrity(data) } : {}) };
+    if (!unpacked) pending.set(vpath, data);
   }
   const ordered = orderedFiles(tree);
   let cursor = 0;
   for (const [, node] of ordered) {
+    if (node.unpacked) continue;
     node.offset = String(cursor);
     cursor += node.size;
   }
@@ -404,7 +423,8 @@ export function createAsar(destAsar: string, files: Map<string, Buffer>, opts?: 
   const fd = fs.openSync(tmp, 'w');
   try {
     fs.writeSync(fd, header);
-    for (const [vpath] of ordered) {
+    for (const [vpath, node] of ordered) {
+      if (node.unpacked) continue;
       fs.writeSync(fd, pending.get(vpath)!);
     }
     fs.fsyncSync(fd);

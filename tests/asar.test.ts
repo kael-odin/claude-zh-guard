@@ -5,12 +5,21 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createAsar, parseAsar, readFile, readFileNode, surgicalRebuild, readEmbeddedHeaderHash, getFileNode, listFiles } from '../src/asar.ts';
+import {
+  analyzeWhitelist,
+  buildGatedContext,
+  collectGatedCatalog,
+  mergeLocaleOverride,
+  patchDefaultMessages,
+  patchLanguageWhitelist,
+} from '../src/patch.ts';
 
 function tmpdir(prefix: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
-const ANCHOR = '"en-US","de-DE","fr-FR","ko-KR","ja-JP"';
+const ANCHOR5 = '"en-US","de-DE","fr-FR","ko-KR","ja-JP"';
+const ANCHOR11 = '"en-US","de-DE","fr-FR","ko-KR","ja-JP","es-419","es-ES","it-IT","hi-IN","pt-BR","id-ID"';
 
 function fixtureFiles(): Map<string, Buffer> {
   const files = new Map<string, Buffer>();
@@ -57,7 +66,7 @@ test('外科式重建：追加词典 + 替换 JS，未动文件逐字节一致',
 
   // 模拟补丁：加 zh-CN 词典 + 替换白名单 JS
   const jsOld = readFile(before, 'assets/v1/shared-Xy123.js');
-  const jsNew = Buffer.from(jsOld.toString('utf8').replaceAll(ANCHOR, ANCHOR.slice(0, -1) + ',"zh-CN"'), 'utf8');
+  const jsNew = Buffer.from(jsOld.toString('utf8').replaceAll(ANCHOR5, ANCHOR5.slice(0, -1) + ',"zh-CN"'), 'utf8');
   const dict = Buffer.from(JSON.stringify({ AbCdEf: '你好 {name}' }));
   const result = surgicalRebuild(
     asarPath,
@@ -118,4 +127,94 @@ test('偏移重分配正确：替换更大文件后其余文件仍可读', async
   // readEmbeddedHeaderHash 与 readFileNode 不冲突
   const node = getFileNode(parsed, 'c.js')!;
   assert.ok(readFileNode(parsed, node).equals(files.get('c.js')!));
+});
+
+test('语言白名单：5 语言旧列表与 11 语言新列表都追加到末尾，且幂等', () => {
+  const src = Buffer.from(
+    `var a=["en-US","de-DE","fr-FR","ko-KR","ja-JP"],b=["en-US","de-DE","fr-FR","ko-KR","ja-JP","es-419","es-ES","it-IT","hi-IN","pt-BR","id-ID"];`,
+  );
+  const [out, hits] = patchLanguageWhitelist(src, 'zh-CN');
+  assert.equal(hits, 2);
+  const text = out.toString('utf8');
+  assert.ok(text.includes(`[${ANCHOR5},"zh-CN"]`));
+  assert.ok(text.includes(`[${ANCHOR11},"zh-CN"]`));
+  // 幂等
+  const [again, hits2] = patchLanguageWhitelist(out, 'zh-CN');
+  assert.equal(hits2, 0);
+  assert.ok(again.equals(out));
+  // analyze
+  const a = analyzeWhitelist(text, 'zh-CN');
+  assert.equal(a.hits, 2);
+  assert.equal(a.hasLang, true);
+});
+
+test('unpacked 条目：重建后保留元数据/完整性，内容区只包含打包文件', async (t) => {
+  const dir = tmpdir('asar5-');
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const asarPath = path.join(dir, 'app.asar');
+  const files = new Map<string, Buffer>([
+    ['a.js', Buffer.from('AAAA')],
+    ['native/big.node', Buffer.alloc(1024, 0x11)],
+    ['z.txt', Buffer.from('ZZZ')],
+  ]);
+  const unpacked = new Set(['native/big.node']);
+  createAsar(asarPath, files, { integrity: true, unpacked });
+  const before = parseAsar(asarPath);
+  const nodeBefore = getFileNode(before, 'native/big.node')!;
+  assert.equal(nodeBefore.unpacked, true);
+  assert.equal(nodeBefore.offset, undefined);
+
+  const result = surgicalRebuild(
+    asarPath,
+    asarPath,
+    [{ vpath: 'a.js', data: Buffer.from('AAAAAAAA') }, { vpath: 'i18n/zh-CN.json', data: Buffer.from('{}') }],
+    { integrity: 'always' },
+  );
+  const after = parseAsar(asarPath);
+  const nodeAfter = getFileNode(after, 'native/big.node')!;
+  assert.equal(nodeAfter.unpacked, true);
+  assert.equal(nodeAfter.offset, undefined);
+  assert.deepEqual(nodeAfter.integrity, nodeBefore.integrity);
+  assert.ok(readFile(after, 'a.js').equals(Buffer.from('AAAAAAAA')));
+  assert.ok(readFile(after, 'z.txt').equals(files.get('z.txt')!));
+  // 偏移闭合（忽略 unpacked）
+  let maxEnd = 0;
+  for (const f of listFiles(after.tree)) {
+    const n = getFileNode(after, f)!;
+    if (n.unpacked) continue;
+    maxEnd = Math.max(maxEnd, Number(n.offset) + n.size);
+  }
+  assert.equal(after.contentBase + maxEnd, after.fileSize);
+  assert.equal(result.headerHash, readEmbeddedHeaderHash(asarPath));
+});
+
+test('en-US 词库覆盖：只改词典中存在的键，未覆盖键保留英文', () => {
+  const en = Buffer.from(JSON.stringify({ a: 'Hello', b: 'World', c: 'New key' }));
+  const zh = Buffer.from(JSON.stringify({ a: '你好', b: '世界' }));
+  const { data, changed } = mergeLocaleOverride(en, zh);
+  assert.equal(changed, 2);
+  assert.deepEqual(JSON.parse(data.toString('utf8')), { a: '你好', b: '世界', c: 'New key' });
+});
+
+test('defaultMessage 本地化：精确英文匹配替换兜底文案，并收集 gated 词条', () => {
+  const en = Buffer.from(JSON.stringify({ known: 'Known message' }));
+  const dict = Buffer.from(JSON.stringify({ known: '已知消息' }));
+  const ctx = buildGatedContext(en, Buffer.from('{}'), dict, 'zh-CN');
+  ctx.englishToZh.set('Cancel', '取消');
+  const js = Buffer.from(
+    'a({defaultMessage:"Cancel",id:"gated-cancel"});b({id:"known",defaultMessage:"Known message"});c({defaultMessage:"Unmapped",id:"gated-other"});d({id:"only-id"});e({defaultMessage:"Hello {name}",id:"icu-bad"});',
+  );
+  const added = collectGatedCatalog(js, ctx);
+  assert.equal(added, 1);
+  assert.equal(ctx.gatedCatalog.get('gated-cancel'), '取消');
+  assert.equal(ctx.gatedCatalog.has('known'), false); // 本地词库已有的 id 不重复收集
+  ctx.englishToZh.set('Hello {name}', '你好');
+  const [out, hits] = patchDefaultMessages(js, ctx);
+  const text = out.toString('utf8');
+  assert.equal(hits, 2);
+  assert.ok(text.includes('defaultMessage:"取消",id:"gated-cancel"'));
+  assert.ok(text.includes('id:"known",defaultMessage:"已知消息"'));
+  assert.ok(text.includes('defaultMessage:"Unmapped",id:"gated-other"'));
+  // 中文丢占位符时不替换，避免 ICU 运行时报错
+  assert.ok(text.includes('defaultMessage:"Hello {name}",id:"icu-bad"'));
 });

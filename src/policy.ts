@@ -7,20 +7,12 @@ import { run } from './util.ts';
 const POLICY_KEY = 'HKCU\\SOFTWARE\\Policies\\Claude';
 const VALUE_NAME = 'disableAutoUpdates';
 
-export function setUpdatesDisabled(disabled: boolean): { registry: 'ok' | 'denied' | 'removed'; library: number } {
+export function setUpdatesDisabled(disabled: boolean): { registry: 'ok' | 'denied'; library: number } {
   // 1) 注册表策略（部分系统对 HKCU\Policies 加固，拒绝时降级为非致命）
-  let registry: 'ok' | 'denied' | 'removed' = 'ok';
+  // 用写 0/1 而不是删除：加固环境下删除同样被拒，写 0 语义明确且可回读验证
+  let registry: 'ok' | 'denied' = 'ok';
   try {
-    if (disabled) {
-      run('reg', ['add', POLICY_KEY, '/v', VALUE_NAME, '/t', 'REG_DWORD', '/d', '1', '/f']);
-    } else {
-      try {
-        run('reg', ['delete', POLICY_KEY, '/v', VALUE_NAME, '/f'], { quiet: true });
-        registry = 'removed';
-      } catch {
-        registry = 'removed'; // 值本来就不存在
-      }
-    }
+    run('reg', ['add', POLICY_KEY, '/v', VALUE_NAME, '/t', 'REG_DWORD', '/d', disabled ? '1' : '0', '/f']);
   } catch {
     registry = 'denied';
   }
@@ -43,7 +35,7 @@ export function setUpdatesDisabled(disabled: boolean): { registry: 'ok' | 'denie
     }
   }
   if (registry === 'denied' && library === 0) {
-    throw new Error('无法写入更新策略：注册表被系统加固拒绝，且未找到 3P configLibrary。可忽略（影响：官方自动更新仍开启，建议用 cdzh update 手动升级）');
+    throw new Error('无法写入更新策略：注册表被系统加固拒绝，且未找到 3P configLibrary。请以管理员身份运行（cdzh --elevate updates on|off）');
   }
   return { registry, library };
 }

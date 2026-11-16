@@ -2,7 +2,8 @@
 ========================
 
 本仓库 assets/dict/ 下的简体/繁体中文词典文件（frontend-zh-*.json、
-dynamic-zh-*.json、statsig-zh-*.json、desktop-zh-*.json）复制自开源项目：
+dynamic-zh-*.json、statsig-zh-*.json、desktop-zh-*.json）以及用于
+gated 消息精确匹配的 hardcoded-zh-*.json 复制自开源项目：
 
     javaht/claude-desktop-zh-cn
     https://github.com/javaht/claude-desktop-zh-cn
@@ -11,5 +12,8 @@ dynamic-zh-*.json、statsig-zh-*.json、desktop-zh-*.json）复制自开源项�
 这些词典的键为 Claude Desktop 前端 react-intl 的哈希消息 ID，
 值为 ICU MessageFormat 格式的中文翻译，由该项目的人工与 LLM 协作
 翻译流程产出。依据 MIT 协议在此引用并致谢。
+
+extra-zh-CN.json 是本项目为 Claude 5.x 新增 gated 消息补充的
+英文→中文覆盖表，同样以 MIT 协议发布。
 
 本仓库其余代码为原创，同样以 MIT 协议发布。
