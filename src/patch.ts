@@ -21,7 +21,7 @@ import { fail, fileExists, info, listClaudePids, log, ok, run, startDetached, st
 export const LANGS = ['zh-CN', 'zh-TW', 'zh-HK'] as const;
 export type Lang = (typeof LANGS)[number];
 
-const TOOL_VERSION = '0.3.0';
+const TOOL_VERSION = '0.3.1';
 
 // Claude 4.23118 起语言白名单扩为 11 种语言；更早版本只有前 5 种。
 // 统一按“以 en-US..ja-JP 开头的数组”识别，追加语言到数组末尾（幂等）。
