@@ -1,6 +1,6 @@
 {
   "name": "claude-zh-guard",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "打不坏的 Claude Desktop 汉化管理器（Windows MSIX）：i18n 注入 + 更新守护 + 自动自愈",
   "type": "module",
   "private": true,

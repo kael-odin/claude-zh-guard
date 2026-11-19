@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { detectInstall, toolDataDir } from './detect.ts';
 import { doctor } from './doctor.ts';
-import { assessIonDist, install, LANGS, launch, uninstall, type Lang } from './patch.ts';
+import { install, LANGS, launch, uninstall, type Lang } from './patch.ts';
+import { autopilotTaskStatus, installAutopilotTask, runAutopilot, uninstallAutopilotTask } from './autopilot.ts';
 import { getUpdatePolicyState, setUpdatesDisabled } from './policy.ts';
 import { controlledUpdate, repair } from './update.ts';
 import { watch, installWatchTask } from './guard.ts';
@@ -20,6 +21,7 @@ const HELP = `claude-zh-guard — 打不坏的 Claude Desktop 汉化管理器
   uninstall             卸载补丁，恢复官方纯净状态
   repair                自愈：asar 损坏→备份恢复；版本变更→重打补丁
   update                受控官方更新：恢复纯净→放行更新→自动重打补丁
+  autopilot [install|uninstall|status]  自动守护：Store 更新后自动注册新版并汉化
   watch                 守护巡检（默认 60s；--auto-fix 自动自愈）
   watch-task install|uninstall   注册/注销开机守护计划任务
   updates on|off|status 官方自动更新策略（默认保留；off 为可选加固）
@@ -31,8 +33,10 @@ const HELP = `claude-zh-guard — 打不坏的 Claude Desktop 汉化管理器
   --yes                      自动确认（含关闭运行中的 Claude）
   --launch                   install 完成后自动启动 Claude
   --disable-updates          安装时禁用官方自动更新（可选；默认保留）
+  --autopilot                install 完成后注册 Autopilot 自动守护任务（需 --elevate）
   --interval <秒>            watch 巡检间隔（默认 60）
   --no-auto-fix              watch 只提醒不自动修复
+  --quiet                    autopilot 不输出常规日志（仍写入 autopilot.log）
   --elevate                  以管理员身份重新运行当前命令
   --help                     本帮助
 `;
@@ -46,6 +50,8 @@ interface Args {
   disableUpdates: boolean;
   interval: number;
   autoFix: boolean;
+  quiet: boolean;
+  autopilot: boolean;
   elevate: boolean;
 }
 
@@ -59,6 +65,8 @@ function parseArgs(argv: string[]): Args {
     disableUpdates: false,
     interval: 60,
     autoFix: true,
+    quiet: false,
+    autopilot: false,
     elevate: false,
   };
   const rest = argv.slice(2);
@@ -89,6 +97,12 @@ function parseArgs(argv: string[]): Args {
         break;
       case '--no-auto-fix':
         args.autoFix = false;
+        break;
+      case '--quiet':
+        args.quiet = true;
+        break;
+      case '--autopilot':
+        args.autopilot = true;
         break;
       case '--elevate':
         args.elevate = true;
@@ -143,6 +157,11 @@ function elevateSelf(args: Args): never {
   process.exit(0);
 }
 
+function projectDir(): string {
+  const p = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+  return decodeURIComponent(p);
+}
+
 async function main(): Promise<void> {
   let args: Args;
   try {
@@ -184,6 +203,16 @@ async function main(): Promise<void> {
         } else {
           info('默认保留官方自动更新。更新落地后若界面变回英文，运行 cdzh repair 重打补丁。');
         }
+        if (args.autopilot) {
+          try {
+            installAutopilotTask(projectDir());
+          } catch (e) {
+            warn(`Autopilot 注册失败: ${(e as Error).message}`);
+            info('请用 cdzh --elevate autopilot install 注册（需要管理员）');
+          }
+        } else {
+          info('提示: 加 --autopilot（或 cdzh autopilot install --elevate）可自动处理官方更新');
+        }
         return;
       }
       case 'uninstall':
@@ -198,14 +227,32 @@ async function main(): Promise<void> {
         if (args.elevate) elevateSelf(args);
         await controlledUpdate({ lang: args.lang });
         return;
+      case 'autopilot': {
+        const sub = args.positional[0] ?? 'run';
+        if (sub === 'install') {
+          if (args.elevate) elevateSelf(args);
+          installAutopilotTask(projectDir());
+          return;
+        }
+        if (sub === 'uninstall') {
+          uninstallAutopilotTask();
+          return;
+        }
+        if (sub === 'status') {
+          autopilotTaskStatus();
+          return;
+        }
+        const action = await runAutopilot({ lang: args.lang, launchAfterRepair: true, quiet: args.quiet });
+        info(`autopilot: ${action}`);
+        return;
+      }
       case 'watch':
         await watch({ lang: args.lang, intervalSec: args.interval, autoFix: args.autoFix });
         return;
       case 'watch-task': {
         const action = args.positional[0];
         if (action !== 'install' && action !== 'uninstall') throw new Error('用法: watch-task install|uninstall');
-        const projectDir = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
-        installWatchTask(action, decodeURIComponent(projectDir));
+        installWatchTask(action, projectDir());
         return;
       }
       case 'updates': {
@@ -239,15 +286,19 @@ async function main(): Promise<void> {
         return;
       }
       case 'launch': {
+        if (args.elevate) elevateSelf(args);
         const inst = detectInstall();
         if (!inst) throw new Error('未检测到 Claude Desktop 安装');
-        // 自愈：官方更新可能把界面包写成 0 字节，启动前先修复
-        const st = assessIonDist(inst, args.lang);
-        if (!st.parseable) {
-          warn(`检测到界面包损坏: ${st.error}，尝试自动修复 ...`);
-          await repair(args.lang);
+        // 启动前交给 Autopilot：处理 0 字节、已暂存新版、新版未汉化
+        try {
+          const action = await runAutopilot({ lang: args.lang, launchAfterRepair: false, quiet: true });
+          if (!['healthy', 'not-managed', 'no-install', 'locked'].includes(action)) info(`启动前自动处理: ${action}`);
+        } catch (e) {
+          warn(`自动修复失败: ${(e as Error).message}`);
         }
-        launch(inst);
+        const inst2 = detectInstall();
+        if (!inst2) throw new Error('修复后检测不到 Claude Desktop 安装');
+        launch(inst2);
         return;
       }
       default:

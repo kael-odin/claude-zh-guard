@@ -128,6 +128,90 @@ export function detectAllMsixInstalls(): ClaudeInstall[] {
   return out;
 }
 
+export interface StagedPackage {
+  version: string;
+  packageFullName: string;
+  installRoot: string;
+  manifestPath: string;
+}
+
+/** 语义化版本比较（缺段按 0）。 */
+export function compareVersions(a: string, b: string): number {
+  const pa = a.split('.').map((x) => Number.parseInt(x, 10) || 0);
+  const pb = b.split('.').map((x) => Number.parseInt(x, 10) || 0);
+  const n = Math.max(pa.length, pb.length);
+  for (let i = 0; i < n; i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+/**
+ * 找出 WindowsApps 中已暂存但尚未注册的新版 Claude。
+ * 线索来源：Claude 主日志的 “Staged version X” / releaseName，以及（提权时）直接列目录。
+ */
+export function findStagedNewerPackage(currentVersion: string, packageFamily?: string): StagedPackage | undefined {
+  const hash = packageFamily?.split('_').pop() ?? 'pzs8sxrjxfjjc';
+  const versions = new Set<string>();
+
+  const logDir = path.join(process.env.LOCALAPPDATA ?? '', 'Claude-3p', 'logs');
+  for (const name of ['main.log', 'main1.log', 'main2.log', 'main3.log', 'main4.log']) {
+    try {
+      const p = path.join(logDir, name);
+      if (!fileExists(p)) continue;
+      const st = fs.statSync(p);
+      const len = Math.min(st.size, 256 * 1024);
+      const fd = fs.openSync(p, 'r');
+      const buf = Buffer.alloc(len);
+      try {
+        fs.readSync(fd, buf, 0, len, Math.max(0, st.size - len));
+      } finally {
+        fs.closeSync(fd);
+      }
+      const text = buf.toString('utf8');
+      for (const m of text.matchAll(/Staged version ([\d.]+)/g)) versions.add(m[1]!);
+      for (const m of text.matchAll(/releaseName: 'Claude ([\d.]+)'/g)) versions.add(m[1]!);
+    } catch {
+      /* 日志不可读则跳过 */
+    }
+  }
+
+  try {
+    const root = 'C:\\Program Files\\WindowsApps';
+    for (const name of fs.readdirSync(root)) {
+      const m = name.match(/^Claude_([\d.]+)_x64__([a-z0-9]+)$/i);
+      if (m && m[2] === hash) versions.add(m[1]!);
+    }
+  } catch {
+    /* 非提权时无法列 WindowsApps，继续用日志线索 */
+  }
+
+  const candidates: StagedPackage[] = [];
+  for (const raw of versions) {
+    if (compareVersions(raw, currentVersion) <= 0) continue;
+    const variants = new Set([raw]);
+    if (raw.split('.').length === 3) variants.add(`${raw}.0`);
+    if (raw.endsWith('.0')) variants.add(raw.slice(0, -2));
+    for (const v of variants) {
+      const pkg = `Claude_${v}_x64__${hash}`;
+      const installRoot = path.join('C:\\Program Files\\WindowsApps', pkg);
+      const manifestPath = path.join(installRoot, 'AppxManifest.xml');
+      const ionPath = path.join(installRoot, 'app', 'resources', 'ion-dist.asar');
+      if (!fileExists(manifestPath) || !fileExists(ionPath)) continue;
+      try {
+        if (fs.statSync(ionPath).size < 50 * 1024 * 1024) continue;
+      } catch {
+        continue;
+      }
+      candidates.push({ version: v, packageFullName: pkg, installRoot, manifestPath });
+      break;
+    }
+  }
+  candidates.sort((a, b) => compareVersions(b.version, a.version));
+  return candidates[0];
+}
+
 /** 可能存放 locale/disableAutoUpdates 配置的 config.json 路径（仅返回已存在的）。 */
 export function existingConfigPaths(family?: string): string[] {
   const appdata = process.env.APPDATA ?? '';

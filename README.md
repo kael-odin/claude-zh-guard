@@ -18,10 +18,11 @@ claude-zh-guard 从架构上终结这个循环：**纯净备份在包外、更�
 
 ```bat
 node src\cli.ts doctor                  :: 先体检，看看现状（只读）
-node src\cli.ts install --yes --launch  :: 装中文界面（自动备份，失败即回滚）
+node src\cli.ts install --yes --launch --autopilot --elevate
+                                        :: 装中文界面 + 注册自动更新守护
 ```
 
-默认保留官方自动更新。官方更新落地后若界面变回英文，运行 `node src\cli.ts repair` 重打补丁；想彻底避免更新覆盖补丁，可加 `--disable-updates` 或运行 `updates off`。
+默认保留官方自动更新。`--autopilot` 会注册每 2 分钟静默巡检的计划任务：Store 推新版、注册被延迟、旧包被写成 0 字节时，自动注册新版、备份、重打补丁并启动。任务用隐藏的 wscript 运行，不弹 UAC，也不闪 cmd 窗口。想彻底避免更新覆盖补丁，可加 `--disable-updates` 或运行 `updates off`。
 
 以后想升级 Claude：
 
@@ -33,7 +34,7 @@ node src\cli.ts update    :: 恢复纯净 → 放行官方更新 → 自动重�
   <img src="./assets/readme/workflow.svg" width="100%" alt="cdzh update 四阶段：恢复纯净 → 放行官方更新 → 重打补丁 → 体检全绿，失败自动回滚">
 </p>
 
-日常还有两道保险：`doctor` 一键体检，`repair` 损坏自愈（从版本匹配的备份恢复并重打补丁）；`watch-task install` 注册开机守护后，官方更新落地会自动重打补丁。
+日常还有三道保险：`doctor` 一键体检；`repair` 损坏自愈；`autopilot` 自动处理官方更新（`autopilot install --elevate` 注册，`autopilot status` 查看，日志在 `%LOCALAPPDATA%\claude-zh-guard\autopilot.log`）。
 
 ## 和原方案比，强在哪
 
@@ -57,6 +58,7 @@ install                 安装汉化补丁（幂等；自动备份、失败回�
 uninstall               卸载补丁，恢复官方纯净状态
 repair                  自愈：损坏→备份恢复；版本变更→重打补丁
 update                  受控官方更新管线
+autopilot [install|uninstall|status]  自动守护：处理 Store 更新/延迟注册/0 字节并重打补丁
 watch                   守护巡检（--interval 秒数；--no-auto-fix 只提醒）
 watch-task install|uninstall   注册/注销开机守护计划任务
 updates on|off|status   官方自动更新策略（默认保留，off 为可选加固）
@@ -64,7 +66,7 @@ dict check|sync         词典覆盖率 / 从上游仓库同步
 launch                  MSIX 激活启动 Claude（启动前自检，损坏自动修复）
 ```
 
-选项：`--lang zh-CN|zh-TW|zh-HK` · `--yes` · `--launch` · `--disable-updates` · `--elevate`
+选项：`--lang zh-CN|zh-TW|zh-HK` · `--yes` · `--launch` · `--disable-updates` · `--autopilot` · `--quiet` · `--elevate`
 </details>
 
 ## 工作原理
@@ -87,6 +89,8 @@ Claude 前端有正规的 i18n 系统：运行时加载 `/i18n/<语言>.json`，
 ## 官方更新后打不开
 
 Store 后台更新会先对旧包做热更新，已打补丁的 `ion-dist.asar` / `app.asar` 可能被写成 0 字节，同时新版因旧版在运行而延迟注册。
+
+最省事：`node src\cli.ts autopilot install --elevate` 注册守护，之后每 2 分钟静默检查并自动修复，不需要手动操作。手动处理步骤：
 
 1. 先运行 `node src\cli.ts launch`：同版本 0 字节会自动从备份修复并重打补丁。
 2. 如果 `C:\Program Files\WindowsApps` 下已有更新的 `Claude_<版本>_x64__pzs8sxrjxfjjc` 目录，但 `Get-AppxPackage -Name Claude` 仍是旧版本：先退出 Claude 和 `CoworkVMService`，再强制注册新版（把路径换成实际版本）：
