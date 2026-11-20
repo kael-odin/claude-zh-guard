@@ -27,8 +27,8 @@ console.log('temp:', tmpRoot);
 // 优先用本工具的纯净备份做源，确保测试的是“从官方纯净态打补丁”的完整流程
 const state = loadState();
 const backup = state?.backups?.find((b) => b.version === inst.version);
-const ionSrc = backup && fs.existsSync(path.join(backup.dir, 'ion-dist.asar')) ? path.join(backup.dir, 'ion-dist.asar') : inst.ionDistPath;
-const appSrc = backup && fs.existsSync(path.join(backup.dir, 'app.asar')) ? path.join(backup.dir, 'app.asar') : inst.appAsarPath;
+const ionSrc = process.env.CDZH_SOURCE_ION ?? (backup && fs.existsSync(path.join(backup.dir, 'ion-dist.asar')) ? path.join(backup.dir, 'ion-dist.asar') : inst.ionDistPath);
+const appSrc = process.env.CDZH_SOURCE_APP ?? (backup && fs.existsSync(path.join(backup.dir, 'app.asar')) ? path.join(backup.dir, 'app.asar') : inst.appAsarPath);
 console.log('source:', backup ? `backup v${inst.version}（纯净）` : '当前安装（可能已打补丁）');
 const workIon = path.join(tmpRoot, 'ion-dist.asar');
 const workApp = path.join(tmpRoot, 'app.asar');
