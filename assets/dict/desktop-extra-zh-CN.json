@@ -197,5 +197,7 @@
   "a7AO7xQ4AF": "Claude 将控制此模拟器并在其上安装和运行应用。其整个屏幕的截图会发送给 Anthropic，并遵循你的对话保留设置。",
   "bzjbetJaYu": "此电脑的文件夹限制不适用于插件在 {host} 上运行的内容。",
   "drEcsgWF/S": "扩展所需。登录信息会被保存并与 Cowork 共享。",
-  "uEfd/Zx/hB": "Claude 将控制此模拟器并在其上安装和运行应用。其整个屏幕的截图会发送给 Anthropic，并遵循你的对话保留设置。"
+  "uEfd/Zx/hB": "Claude 将控制此模拟器并在其上安装和运行应用。其整个屏幕的截图会发送给 Anthropic，并遵循你的对话保留设置。",
+  "KWmT+sHQrn": "以“{login}”身份登录 {host}",
+  "QoBk0vsDtW": "登录 {host}"
 }

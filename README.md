@@ -4,7 +4,7 @@
 
 **打不坏的 Claude Desktop 汉化管理器**——给微软商店版 Claude Desktop 装上简繁中文界面，并用备份、守护和自动回滚降低官方更新带来的风险。
 
-![platform](https://img.shields.io/badge/platform-Windows_10+-00599C) ![runtime](https://img.shields.io/badge/Node.js-%E2%89%A522.7-339933) ![license](https://img.shields.io/badge/license-MIT-green) ![claude](https://img.shields.io/badge/Claude_Desktop-4.29%E2%80%936.6395.1 tested-D97757) ![coverage](https://img.shields.io/badge/%E8%AF%8D%E5%85%B8%E8%A6%86%E7%9B%96-82.8%25-6FBF73)
+![platform](https://img.shields.io/badge/platform-Windows_10+-00599C) ![runtime](https://img.shields.io/badge/Node.js-%E2%89%A522.7-339933) ![license](https://img.shields.io/badge/license-MIT-green) ![claude](https://img.shields.io/badge/Claude_Desktop-4.29%E2%80%936.28899 tested-D97757) ![coverage](https://img.shields.io/badge/%E8%AF%8D%E5%85%B8%E8%A6%86%E7%9B%96-80.5%25-6FBF73)
 
 ## 为什么会有这个项目
 
@@ -84,7 +84,7 @@ Claude 前端有正规的 i18n 系统：运行时加载 `/i18n/<语言>.json`，
 
 ## 词典与致谢
 
-界面词典来自 [javaht/claude-desktop-zh-cn](https://github.com/javaht/claude-desktop-zh-cn)（MIT），简繁繁体（zh-CN/TW/HK）三套齐备，见 [NOTICE](NOTICE)。`dict sync` 会浅克隆并同步上游最新词典，`dict check` 查看三套词库（前端 / dynamic / 主进程）对当前版本的覆盖率（6.6395.1 实测：前端 82.8%、dynamic 100%、主进程 100%）。上游未覆盖的 gated 消息由 `hardcoded-zh-*.json` 精确英文匹配 + `extra-zh-CN.json` 人工补充兜底，6.6395.1 实测本地化 5.1 万处（51,801 处） `defaultMessage`；ICU 占位符不一致或同一英文存在多种译法时跳过，避免运行时报错或误译。主进程缺失词条由 `desktop-extra-zh-CN.json` 补齐。
+界面词典来自 [javaht/claude-desktop-zh-cn](https://github.com/javaht/claude-desktop-zh-cn)（MIT），简繁繁体（zh-CN/TW/HK）三套齐备，见 [NOTICE](NOTICE)。`dict sync` 会浅克隆并同步上游最新词典，`dict check` 查看三套词库（前端 / dynamic / 主进程）对当前版本的覆盖率（6.28899 实测：前端 80.5%、dynamic 100%、主进程 100%）。上游未覆盖的 gated 消息由 `hardcoded-zh-*.json` 精确英文匹配 + `extra-zh-CN.json` 人工补充兜底，6.28899 实测本地化 5.2 万处（52,046 处） `defaultMessage`；ICU 占位符不一致或同一英文存在多种译法时跳过，避免运行时报错或误译。主进程缺失词条由 `desktop-extra-zh-CN.json` 补齐。
 
 ## 官方更新后打不开
 
