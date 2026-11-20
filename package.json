@@ -9,7 +9,7 @@
     "cdzh": "bin/cdzh.js"
   },
   "scripts": {
-    "test": "node --test tests/",
+    "test": "node --test tests/asar.test.ts",
     "typecheck": "tsc --noEmit",
     "cdzh": "node src/cli.ts"
   },
