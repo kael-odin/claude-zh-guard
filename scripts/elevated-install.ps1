@@ -8,7 +8,7 @@ $out2 = & icacls "C:\Program Files\WindowsApps\Claude_4.4212.0.0_x64__pzs8sxrjxf
 "icacls exit=$LASTEXITCODE, 末行=$($out2 | Select-Object -Last 1)" | Out-File $log -Append -Encoding utf8
 
 # 2) 提权环境里直接跑安装
-$out3 = & node "F:\kael\claude-zh-guard\src\cli.ts" install --yes 2>&1
+$out3 = & node (Join-Path $PSScriptRoot '..\src\cli.ts') install --yes 2>&1
 "install exit=${LASTEXITCODE}:" | Out-File $log -Append -Encoding utf8
 $out3 | Select-Object -Last 6 | Out-File $log -Append -Encoding utf8
 "done $(Get-Date -Format 'HH:mm:ss')" | Out-File $log -Append -Encoding utf8
